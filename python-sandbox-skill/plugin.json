@@ -23,7 +23,10 @@
       "mode": {
         "type": "string",
         "description": "Ausführungs­modus: 'ephemeral' für neuen Container, 'persistent' für bestehenden",
-        "enum": ["ephemeral", "persistent"],
+        "enum": [
+          "ephemeral",
+          "persistent"
+        ],
         "default": "ephemeral"
       },
       "projectPath": {

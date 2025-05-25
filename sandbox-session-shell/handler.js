@@ -5,13 +5,12 @@ const crypto = require('crypto');
 const CHALLENGE_STORE = path.join(__dirname, 'pending-challenges.json');
 const CONFIG_PATH = path.join(__dirname, 'config.json');
 const SESSION_SUMMARY_TRACK = path.join(__dirname, 'notified-sessions.json');
+const LOG_DIR = "/tmp";
 
-// Load config once per handler call
 function loadConfig() {
   return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 }
 
-// Keep track of which sessionIds have been notified of the config (in-memory or file)
 function loadSessionNotified() {
   if (fs.existsSync(SESSION_SUMMARY_TRACK)) {
     return JSON.parse(fs.readFileSync(SESSION_SUMMARY_TRACK, 'utf8'));
@@ -22,7 +21,6 @@ function saveSessionNotified(obj) {
   fs.writeFileSync(SESSION_SUMMARY_TRACK, JSON.stringify(obj, null, 2), 'utf8');
 }
 
-// Core command validation
 function validateCommand(command, config) {
   if (!command || typeof command !== "string" || !command.trim()) {
     return "❌ Der Befehl darf nicht leer sein.";
@@ -30,21 +28,16 @@ function validateCommand(command, config) {
   if (command.length > (config.maxCommandLength || 256)) {
     return `❌ Der Befehl ist zu lang (maximal ${config.maxCommandLength || 256} Zeichen).`;
   }
-
-  // Pipes, Verkettungen, Subshells blocken (for security)
   const forbiddenPattern = /[\n;|&`$()\\]/;
   if (forbiddenPattern.test(command)) {
     return "❌ Verkettete, verschachtelte oder mehrzeilige Shell-Kommandos sind nicht erlaubt.";
   }
-
-  // Blacklist commands
   for (const forbidden of config.forbiddenCommands || []) {
     const pattern = new RegExp(`\\b${forbidden.trim()}\\b`, "i");
     if (pattern.test(command)) {
       return `❌ Der Befehl ist verboten: "${forbidden}". Passe die Konfiguration an, falls du ihn erlauben möchtest.`;
     }
   }
-  // Blacklist patterns
   for (const pat of config.forbiddenPatterns || []) {
     try {
       if (pat.trim() && new RegExp(pat, "i").test(command)) {
@@ -55,7 +48,6 @@ function validateCommand(command, config) {
   return null;
 }
 
-// Whitelist check (for immediate exec, no challenge)
 function isWhitelisted(command, config) {
   return (
     config.whitelistCommands &&
@@ -65,7 +57,6 @@ function isWhitelisted(command, config) {
   );
 }
 
-// Write path validation (rudimentary, extend as needed)
 function isAllowedWritePath(filename, config) {
   let absPath = filename;
   if (!path.isAbsolute(absPath)) return true;
@@ -90,7 +81,6 @@ function extractWriteFiles(command) {
   return files;
 }
 
-// Challenge storage
 function generateSessionId() {
   return crypto.randomBytes(12).toString('hex');
 }
@@ -118,42 +108,52 @@ function configSummary(config) {
   ].join('\n');
 }
 
+// JSONL-Logger für jedes Kommando
+function logToJsonl(sessionId, command, output) {
+  const logFile = path.join(LOG_DIR, `anythingllm_shelllog_${sessionId}.jsonl`);
+  const entry = {
+    timestamp: new Date().toISOString(),
+    session: sessionId,
+    command,
+    output
+  };
+  fs.appendFileSync(logFile, JSON.stringify(entry) + '\n');
+}
+
 module.exports.runtime = {
   handler: async function (args = {}) {
     const { spawnSync } = require('child_process');
     let { sessionId, projectPath, command, confirmationCode, destroyContainer } = args;
     const config = loadConfig();
 
-    // Generate or validate sessionId
+    // SessionId erzeugen/festlegen
     if (!sessionId || typeof sessionId !== "string" || !sessionId.match(/^[a-zA-Z0-9\-_]{3,40}$/)) {
       sessionId = generateSessionId();
-      // Return config summary for new session
       const summary = configSummary(config) +
         `\n\nNeue sessionId: ${sessionId}\nBitte verwende diese sessionId für alle weiteren Befehle in diesem Chat!`;
       return summary;
     }
     const containerName = "sandbox_" + sessionId;
 
-    // --- Inform the AI about the config, but only once per sessionId ---
+    // Config-Zusammenfassung am Start der SessionId nur einmal senden
     const notified = loadSessionNotified();
     if (!notified[sessionId]) {
       notified[sessionId] = true;
       saveSessionNotified(notified);
-      // Use return, so the LLM/AI can read it
       return configSummary(config) +
         `\n\nBitte benutze sessionId ${sessionId} für alle weiteren Befehle.`;
     }
 
-    // --- Container destroy? ---
+    // Container-Stop/Löschung
     if (destroyContainer === true) {
       this.introspect(
         `⚠️ Soll der Container für diese Session wirklich gelöscht werden?\n\n` +
         `Antworte mit:\n{"sessionId": "${sessionId}", "destroyContainer": true, "confirmationCode": "<CODE>"}`
       );
-      return "Container-Löschung benötigt ebenfalls einen Sicherheitscode. Bitte Code eingeben.";
+      return `[Session: ${sessionId}]\nContainer-Löschung benötigt einen Sicherheitscode.`;
     }
 
-    // --- Projektpfad prüfen ---
+    // Projektpfad prüfen
     if (!projectPath || typeof projectPath !== "string" || !projectPath.trim()) {
       throw new Error("❌ Parameter 'projectPath' fehlt oder ist ungültig.");
     }
@@ -162,63 +162,79 @@ module.exports.runtime = {
       throw new Error(`❌ Projektverzeichnis nicht gefunden: ${absProject}`);
     }
 
-    // --- Command validation (BLACKLIST first!) ---
+    // Command Validation (BLACKLIST first!)
     const validationError = validateCommand(command, config);
-    if (validationError) return validationError;
+    if (validationError) return `[Session: ${sessionId}]\n${validationError}`;
 
-    // --- Whitelist: run immediately, no challenge ---
+    // Whitelist: sofort ausführen, keine Challenge
     if (isWhitelisted(command, config)) {
-      // Ensure container exists
+      // Container sicherstellen
       let exists = spawnSync(
         `docker ps -q -f name=${containerName}`,
         { shell: true, encoding: "utf8" }
       ).stdout.trim();
+
       if (!exists) {
         let userOpt = "";
         if (config.defaultContainerUser && config.defaultContainerUser !== "root") {
           userOpt = `--user ${config.defaultContainerUser}`;
         }
-        spawnSync([
+        const runCmd = [
           'docker run -d --name', containerName,
           `-v ${absProject}:/sandbox/project:rw`,
           '-w /sandbox/project',
           userOpt,
           config.defaultDockerImage,
           'tail -f /dev/null'
-        ].join(' '), { shell: true });
+        ].join(' ');
+        this.introspect(`[INFO] Führe aus: ${runCmd}`);
+        spawnSync(runCmd, { shell: true });
         await new Promise(res => setTimeout(res, 1000));
-        if (config.enableIntrospectDebug)
-          this.introspect(`[DEBUG] Neuer Container ${containerName} gestartet als User: ${config.defaultContainerUser || "root"}`);
+
+        // Verifizieren, dass Container läuft
+        const verify = spawnSync(
+          `docker ps -q -f name=${containerName}`,
+          { shell: true, encoding: "utf8" }
+        ).stdout.trim();
+        if (!verify) {
+          const logOutput = spawnSync(
+            `docker logs ${containerName}`,
+            { shell: true, encoding: "utf8" }
+          ).stdout.trim();
+          throw new Error(
+            `❌ Fehler: Container '${containerName}' konnte nicht erfolgreich gestartet werden!` +
+            (logOutput ? `\nDocker-Log-Ausgabe:\n${logOutput}` : "")
+          );
+        }
+        this.introspect(`[DEBUG] Container '${containerName}' läuft (SessionId: ${sessionId})`);
       }
 
-      this.introspect(`▶️ Führe im Container aus (Whitelist, kein 2FA): ${command}`);
-      const res = spawnSync(
-        `docker exec ${containerName} bash -lc "${command}"`,
-        { shell: true, encoding: "utf8" }
-      );
+      const execCmd = `docker exec ${containerName} bash -lc "${command}"`;
+      this.introspect(`[INFO] Führe aus: ${execCmd}`);
+      const res = spawnSync(execCmd, { shell: true, encoding: "utf8" });
       let output = (res.stdout || "") + (res.stderr || "");
+      logToJsonl(sessionId, command, output);
       if (res.status !== 0) {
         output = `❌ Fehler (Exit-Code ${res.status}):\n${output}`;
       }
-      return output.trim();
+      return `[Session: ${sessionId}]\n[INFO] Führe aus: ${execCmd}\n${output.trim()}\nLog: ${LOG_DIR}/anythingllm_shelllog_${sessionId}.jsonl`;
     }
 
-    // --- Write path check for non-whitelist commands ---
+    // Schreib-Checks für nicht-whitelist Befehle
     const writeFiles = extractWriteFiles(command);
     for (const f of writeFiles) {
       if (!isAllowedWritePath(path.resolve(absProject, f), config)) {
-        return `❌ Schreibzugriff auf ${f} ist nicht erlaubt.`;
+        return `[Session: ${sessionId}]\n❌ Schreibzugriff auf ${f} ist nicht erlaubt.`;
       }
     }
 
-    // --- 2FA Challenge mechanism for other commands ---
+    // 2FA Challenge für sonstige Kommandos
     const challenges = loadChallenges();
     const challenge = challenges[sessionId];
     const now = Date.now();
 
-    // New challenge needed if no code, or wrong code, or expired, or different command
     if (!confirmationCode || !challenge || challenge.command !== command || challenge.projectPath !== projectPath || now - challenge.timestamp > ((config.maxChallengeAge || 180) * 1000)) {
-      // Create new challenge
+      // Neue Challenge erzeugen
       const code = randomCode();
       challenges[sessionId] = {
         command,
@@ -233,17 +249,16 @@ module.exports.runtime = {
       );
       if (config.enableIntrospectDebug)
         this.introspect(`[DEBUG] Challenge erzeugt für Session ${sessionId} und command: ${command}`);
-      return "Warte auf Bestätigungscode vom Benutzer...";
+      return `[Session: ${sessionId}]\nWarte auf Bestätigungscode vom Benutzer...`;
     }
 
     if (challenge.code !== confirmationCode) {
-      return "❌ Sicherheitscode falsch oder abgelaufen. Bitte neuen Befehl anfordern!";
+      return `[Session: ${sessionId}]\n❌ Sicherheitscode falsch oder abgelaufen. Bitte neuen Befehl anfordern!`;
     }
-    // One-time use
     delete challenges[sessionId];
     saveChallenges(challenges);
 
-    // Ensure container exists (again, in case it was removed)
+    // Container wieder sicherstellen (z.B. nach Timeout)
     let exists = spawnSync(
       `docker ps -q -f name=${containerName}`,
       { shell: true, encoding: "utf8" }
@@ -253,28 +268,43 @@ module.exports.runtime = {
       if (config.defaultContainerUser && config.defaultContainerUser !== "root") {
         userOpt = `--user ${config.defaultContainerUser}`;
       }
-      spawnSync([
+      const runCmd = [
         'docker run -d --name', containerName,
         `-v ${absProject}:/sandbox/project:rw`,
         '-w /sandbox/project',
         userOpt,
         config.defaultDockerImage,
         'tail -f /dev/null'
-      ].join(' '), { shell: true });
+      ].join(' ');
+      this.introspect(`[INFO] Führe aus: ${runCmd}`);
+      spawnSync(runCmd, { shell: true });
       await new Promise(res => setTimeout(res, 1000));
-      if (config.enableIntrospectDebug)
-        this.introspect(`[DEBUG] Neuer Container ${containerName} gestartet als User: ${config.defaultContainerUser || "root"}`);
+
+      const verify = spawnSync(
+        `docker ps -q -f name=${containerName}`,
+        { shell: true, encoding: "utf8" }
+      ).stdout.trim();
+      if (!verify) {
+        const logOutput = spawnSync(
+          `docker logs ${containerName}`,
+          { shell: true, encoding: "utf8" }
+        ).stdout.trim();
+        throw new Error(
+          `❌ Fehler: Container '${containerName}' konnte nicht erfolgreich gestartet werden!` +
+          (logOutput ? `\nDocker-Log-Ausgabe:\n${logOutput}` : "")
+        );
+      }
+      this.introspect(`[DEBUG] Container '${containerName}' läuft (SessionId: ${sessionId})`);
     }
 
-    this.introspect(`▶️ Führe im Container aus (mit 2FA): ${command}`);
-    const res = spawnSync(
-      `docker exec ${containerName} bash -lc "${command}"`,
-      { shell: true, encoding: "utf8" }
-    );
+    const execCmd = `docker exec ${containerName} bash -lc "${command}"`;
+    this.introspect(`[INFO] Führe aus: ${execCmd}`);
+    const res = spawnSync(execCmd, { shell: true, encoding: "utf8" });
     let output = (res.stdout || "") + (res.stderr || "");
+    logToJsonl(sessionId, command, output);
     if (res.status !== 0) {
       output = `❌ Fehler (Exit-Code ${res.status}):\n${output}`;
     }
-    return output.trim();
+    return `[Session: ${sessionId}]\n[INFO] Führe aus: ${execCmd}\n${output.trim()}\nLog: ${LOG_DIR}/anythingllm_shelllog_${sessionId}.jsonl`;
   }
 };

@@ -6,36 +6,33 @@
 
 ## Zweck
 
-Ein AnythingLLM-Agent-Skill für maximale Sicherheit:
+Ein AnythingLLM-Agent-Skill für erhöhte Sicherheit:
 
-- Führt Shell-Befehle **nur nach expliziter User-Bestätigung per Challenge-Code (2FA)** in einem persistenten Docker-Container pro Session aus.
-- Die KI (und automatisierte Agenten) können **keine Befehle ohne Nutzer-Interaktion freigeben**.
-- Zentrale Konfiguration aller Sicherheitsregeln, User, Whitelists etc.
+- Führt Shell-Befehle **nur nach expliziter User-Bestätigung per Challenge-Code (2FA)** in einem persistenten Docker-Container pro Session aus, es sei denn, der Befehl ist whitelisted.
+- Die KI (und automatisierte Agenten) können **keine gefährlichen Befehle ohne Nutzer-Interaktion freigeben**.
+- Konfiguration, Whitelist/Blacklist und Challenge-Regeln sind zentral in config.json steuerbar.
 
 ---
 
 ## Features
 
-- **Sicherer Challenge-Flow:**  
-  Jeder kritische Befehl kann nur nach echtem Code-Eingabe freigegeben werden.
-- **Zentrale config.json:**  
-  Blacklist/Whitelist für Kommandos und Verzeichnisse, User, Docker-Image, Challenge-Zeit, Debug.
-- **Nur ein aktiver Challenge-Code pro Session und Befehl, zeitlich begrenzt gültig.**
-- **Warnungen und Hinweise im Debug-Modus via Introspect.**
-- **Voreinstellung:** Kein Root, keine gefährlichen Kommandos oder Verzeichnisse, alles einfach anpassbar.
+- **Whitelisted-Befehle** laufen sofort (ohne 2FA).
+- **Blacklisted-Befehle** werden immer blockiert.
+- **Andere Befehle** benötigen Challenge-Code (2FA).
+- **Beim Start jeder Session** informiert der Skill die KI/den Agenten einmalig über die aktiven Regeln.
+- **Container bleiben erhalten** bis zur expliziten Zerstörung.
 
 ---
 
 ## Installation & Setup
 
-1. **Lege die vier Dateien**
-    - `config.json`
-    - `plugin.json`
-    - `handler.js`
-    - (`pending-challenges.json` wird automatisch erstellt)
-    
-    im Ordner  
-    `~/.config/anythingllm-desktop/storage/plugins/agent-skills/sandbox-session-shell/` ab.
+1. Lege die Dateien  
+   - `config.json`
+   - `plugin.json`
+   - `handler.js`
+   - (`pending-challenges.json`, `notified-sessions.json` werden automatisch erstellt)  
+   im Ordner  
+   `~/.config/anythingllm-desktop/storage/plugins/agent-skills/sandbox-session-shell/` ab.
 
 2. **Docker muss laufen**  
    und dein User Docker-Rechte haben.
@@ -55,7 +52,7 @@ Ein AnythingLLM-Agent-Skill für maximale Sicherheit:
 }
 ```
 Antwort:  
-Skill erzeugt sessionId, fordert Challenge-Code.
+Skill erzeugt sessionId und gibt eine Konfigurationsübersicht zurück.
 
 ---
 
@@ -68,7 +65,8 @@ Skill erzeugt sessionId, fordert Challenge-Code.
 }
 ```
 Antwort:  
-Skill fordert Challenge-Code.
+Wenn der Befehl whitelisted ist, wird er sofort ausgeführt.  
+Sonst fordert der Skill einen Challenge-Code.
 
 ---
 
@@ -94,6 +92,7 @@ Befehl wird ausgeführt, Ausgabe erscheint im Chat/UI.
   "confirmationCode": "DEINCODE"
 }
 ```
+
 ---
 
 ## Hinweise

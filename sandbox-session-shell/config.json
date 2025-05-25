@@ -25,7 +25,7 @@
   ],
   "maxCommandLength": 256,
   "defaultDockerImage": "python:3.10-slim",
-  "defaultContainerUser": "llmuser",   // nutzername im container, siehe unten!
-  "maxChallengeAge": 180,              // Sekunden
+  "defaultContainerUser": "llmuser",
+  "maxChallengeAge": 180,
   "enableIntrospectDebug": true
 }

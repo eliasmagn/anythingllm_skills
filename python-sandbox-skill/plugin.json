@@ -1,0 +1,33 @@
+{
+  "hubId": "python-sandbox-skill",
+  "active": true,
+  "name": "Python Sandbox",
+  "version": "1.1.0",
+  "schema": "skill-1.0.0",
+  "description": "Führt Python-Code eines kompletten Projekts in einem isolierten Docker-Container aus. Kopiert das Projekt, installiert Abhängigkeiten und führt einen Befehl aus.",
+  "author": "DeinName",
+  "license": "MIT",
+  "examples": [
+    {
+      "prompt": "Starte das Projekt unter `/home/elias/myproj` mit `main.py`",
+      "call": "{\"projectPath\": \"/home/elias/myproj\", \"command\": \"python main.py\"}"
+    },
+    {
+      "prompt": "Baue das Projekt unter `/home/elias/myproj` und führe Tests aus",
+      "call": "{\"projectPath\": \"/home/elias/myproj\", \"command\": \"pip install -r requirements.txt && pytest\"}"
+    }
+  ],
+  "entrypoint": {
+    "file": "handler.js",
+    "params": {
+      "projectPath": {
+        "type": "string",
+        "description": "Absoluter Pfad zum Wurzelverzeichnis deines Python-Projekts."
+      },
+      "command": {
+        "type": "string",
+        "description": "Der Befehl, der im Projekt ausgeführt werden soll, z.B. `python main.py` oder `pytest`."
+      }
+    }
+  }
+}

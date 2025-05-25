@@ -1,0 +1,79 @@
+{
+  "hubId": "git-access-skill",
+  "active": true,
+  "name": "Git Access",
+  "version": "1.0.0",
+  "schema": "skill-1.0.0",
+  "description": "Ermöglicht Git-Operationen (create, clone, pull, commit, push, merge) mit Username/Password. Repos werden standardmäßig privat angelegt.",
+  "author": "MintplexLabs",
+  "author_url": "https://hub.anythingllm.com/u/MintplexLabs",
+  "license": "MIT",
+  "examples": [
+    {
+      "prompt": "Erstelle ein neues privates Repo namens \"myproject\" in GitHub und initialisiere es lokal unter /home/elias/Development/ADRIANA/myproject",
+      "call": "{\"action\":\"create\",\"repoName\":\"myproject\",\"localPath\":\"/home/elias/Development/ADRIANA/myproject\",\"username\":\"<USER>\",\"password\":\"<PWD>\"}"
+    },
+    {
+      "prompt": "Klone das Repo \"myproject\" in /home/elias/Development/ADRIANA/myproject",
+      "call": "{\"action\":\"clone\",\"repoName\":\"myproject\",\"localPath\":\"/home/elias/Development/ADRIANA/myproject\",\"username\":\"<USER>\",\"password\":\"<PWD>\"}"
+    },
+    {
+      "prompt": "Führe im Ordner /home/elias/Development/ADRIANA/myproject einen Commit mit Message \"Update docs\" aus",
+      "call": "{\"action\":\"commit\",\"localPath\":\"/home/elias/Development/ADRIANA/myproject\",\"commitMessage\":\"Update docs\"}"
+    },
+    {
+      "prompt": "Pushe den aktuellen Branch aus /home/elias/Development/ADRIANA/myproject",
+      "call": "{\"action\":\"push\",\"localPath\":\"/home/elias/Development/ADRIANA/myproject\"}"
+    },
+    {
+      "prompt": "Merge Branch \"feature\" in \"main\" im Repo unter /home/elias/Development/ADRIANA/myproject",
+      "call": "{\"action\":\"merge\",\"localPath\":\"/home/elias/Development/ADRIANA/myproject\",\"sourceBranch\":\"feature\",\"targetBranch\":\"main\"}"
+    }
+  ],
+  "setup_args": {},
+  "entrypoint": {
+    "file": "handler.js",
+    "params": {
+      "action": {
+        "type": "string",
+        "description": "Einer von: create, clone, pull, commit, push, merge",
+        "enum": [
+          "create",
+          "clone",
+          "pull",
+          "commit",
+          "push",
+          "merge"
+        ]
+      },
+      "repoName": {
+        "type": "string",
+        "description": "Name des Repositories (bei create/clone)"
+      },
+      "localPath": {
+        "type": "string",
+        "description": "Lokaler Pfad zum Repository (bei allen Aktionen außer create wird path zum existierenden Repo)"
+      },
+      "username": {
+        "type": "string",
+        "description": "GitHub Username für Authentifizierung"
+      },
+      "password": {
+        "type": "string",
+        "description": "GitHub Password oder Token"
+      },
+      "commitMessage": {
+        "type": "string",
+        "description": "Commit-Message (nur für commit)"
+      },
+      "sourceBranch": {
+        "type": "string",
+        "description": "Branch, der gemerged werden soll (nur für merge)"
+      },
+      "targetBranch": {
+        "type": "string",
+        "description": "Ziel-Branch für den Merge (nur für merge)"
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "hubId": "file_access",
+  "active": true,
+  "name": "File Access",
+  "version": "1.2.0",
+  "schema": "skill-1.0.0",
+  "description": "Liest, schreibt oder erstellt Ordner in vordefinierten, erlaubten Verzeichnissen.",
+  "author": "MintplexLabs",
+  "author_url": "https://hub.anythingllm.com/u/MintplexLabs",
+  "license": "MIT",
+  "examples": [
+    {
+      "prompt": "Erstelle einen neuen Ordner backups im Verzeichnis /home/elias/Development/ADRIANA",
+      "call": "{\"action\":\"mkdir\",\"path\":\"/home/elias/Development/ADRIANA/backups\"}"
+    },
+    {
+      "prompt": "Schreibe 'Hallo Welt' in hallo.txt im Ordner /home/elias/Development/ADRIANA",
+      "call": "{\"action\":\"write\",\"path\":\"/home/elias/Development/ADRIANA\",\"filename\":\"hallo.txt\",\"content\":\"Hallo Welt\"}"
+    },
+    {
+      "prompt": "Lies den Inhalt der Datei /home/elias/Development/ADRIANA/info.txt",
+      "call": "{\"action\":\"read\",\"path\":\"/home/elias/Development/ADRIANA/info.txt\"}"
+    }
+  ],
+  "setup_args": {},
+  "entrypoint": {
+    "file": "handler.js",
+    "params": {
+      "action": {
+        "type": "string",
+        "description": "Entweder 'read', 'write' oder 'mkdir'",
+        "enum": [
+          "read",
+          "write",
+          "mkdir"
+        ]
+      },
+      "path": {
+        "type": "string",
+        "description": "Pfad zur Datei (bei read) / zum Ordner (bei write und mkdir)"
+      },
+      "filename": {
+        "type": "string",
+        "description": "Name der Datei beim Schreiben (nur für write)"
+      },
+      "content": {
+        "type": "string",
+        "description": "Inhalt zum Schreiben (nur für write)"
+      }
+    }
+  }
+}

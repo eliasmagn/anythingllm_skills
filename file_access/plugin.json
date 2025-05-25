@@ -1,6 +1,6 @@
 {
   "hubId": "file_access",
-  "active": true,
+  "active": false,
   "name": "File Access",
   "version": "1.2.0",
   "schema": "skill-1.0.0",

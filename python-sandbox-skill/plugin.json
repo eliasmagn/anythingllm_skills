@@ -1,6 +1,6 @@
 {
   "hubId": "python-sandbox-skill",
-  "active": true,
+  "active": false,
   "name": "Python Sandbox",
   "version": "1.1.0",
   "schema": "skill-1.0.0",

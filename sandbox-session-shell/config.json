@@ -1,0 +1,31 @@
+{
+  "forbiddenCommands": [
+    "rm ", "reboot", "shutdown", "poweroff", "init 0", "halt", "mkfs",
+    "dd ", "fdisk", "mklabel", "chroot", "useradd", "adduser", "docker ",
+    "systemctl", "service ", "chmod 777", "chown"
+  ],
+  "forbiddenPatterns": [
+    "curl (?!https://allowed\\.domain\\.com)",
+    "wget (?!https://allowed\\.domain\\.com)"
+  ],
+  "whitelistCommands": [
+    "ls -l",
+    "cat README.md"
+  ],
+  "alwaysAllowWhitelist": true,
+  "forbiddenWriteDirs": [
+    "/etc", "/proc", "/sys", "/dev", "/boot", "/root", "/bin", "/lib", "/usr", "/home"
+  ],
+  "allowedWriteDirs": [
+    "/sandbox/project"
+  ],
+  "allowedTmpWrite": false,
+  "trustedSystemCommands": [
+    "apt", "dpkg"
+  ],
+  "maxCommandLength": 256,
+  "defaultDockerImage": "python:3.10-slim",
+  "defaultContainerUser": "llmuser",   // nutzername im container, siehe unten!
+  "maxChallengeAge": 180,              // Sekunden
+  "enableIntrospectDebug": true
+}

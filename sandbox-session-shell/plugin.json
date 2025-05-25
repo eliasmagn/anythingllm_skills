@@ -1,0 +1,42 @@
+{
+  "hubId": "sandbox-session-shell",
+  "active": true,
+  "name": "Sandbox Session Shell",
+  "version": "2.3.0",
+  "schema": "skill-1.0.0",
+  "description": "Führt Shell-Befehle in einem persistenten Docker-Container pro SessionId aus. Befehlsausführung erfolgt nur nach expliziter User-Bestätigung mit Challenge-Code (2FA-Prinzip), konfigurierbare Verzeichnis- und Kommandoregeln.",
+  "author": "Elias",
+  "author_url": "",
+  "license": "MIT",
+  "examples": [
+    {
+      "prompt": "Führe 'ls -l' im Session-Container aus",
+      "call": "{\"sessionId\": \"abc123\", \"projectPath\": \"/home/elias/myproj\", \"command\": \"ls -l\"}"
+    }
+  ],
+  "entrypoint": {
+    "file": "handler.js",
+    "params": {
+      "sessionId": {
+        "type": "string",
+        "description": "Eindeutige Session-Id (Chat-Schlüssel) für den persistenten Container. Wird bei erstem Aufruf automatisch generiert, falls leer."
+      },
+      "projectPath": {
+        "type": "string",
+        "description": "Pfad zum Projektverzeichnis, das im Container gemountet wird."
+      },
+      "command": {
+        "type": "string",
+        "description": "Shell-Befehl, der ausgeführt werden soll (z.B. 'ls -l')."
+      },
+      "confirmationCode": {
+        "type": "string",
+        "description": "Vom Nutzer eingegebener Bestätigungscode zur Freigabe des Kommandos."
+      },
+      "destroyContainer": {
+        "type": "boolean",
+        "description": "Wenn true, wird der zu sessionId gehörende Container (nach Nachfrage) entfernt."
+      }
+    }
+  }
+}

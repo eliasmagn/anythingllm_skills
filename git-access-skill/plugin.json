@@ -1,6 +1,6 @@
 {
   "hubId": "git-access-skill",
-  "active": true,
+  "active": false,
   "name": "Git Access",
   "version": "1.0.0",
   "schema": "skill-1.0.0",
